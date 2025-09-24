@@ -37,7 +37,7 @@ export default function LoginPage() {
         </div>
 
         <div className={styles.register}>
-          Don't have an account yet?{" "}
+          Don&apos;t have an account yet?{" "}
           <Link href="/auth/register" className={styles.registerLink}>
             Register for free
           </Link>
