@@ -9,12 +9,12 @@ export function middleware(req: NextRequest) {
 
   // Nếu chưa login → chỉ cho phép vào /login và /register
   if (
-    !token &&
-    !pathname.startsWith("/login") &&
-    !pathname.startsWith("/register")
-  ) {
-    return NextResponse.redirect(new URL("/login", req.url));
-  }
+  !token &&
+  !pathname.startsWith("/auth/login") && // 👈 SỬA LẠI
+  !pathname.startsWith("/auth/register")
+) {
+  return NextResponse.redirect(new URL("/auth/login", req.url)); // 👈 SỬA LẠI
+}
 
   // Nếu là user nhưng vào admin
   if (role === "user" && pathname.startsWith("/admin")) {
@@ -30,5 +30,9 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*", "/login", "/register"],
+  matcher: ["/dashboard/:path*", 
+            "/admin/:path*", 
+            "/login", 
+            "/lms/:path*",
+            "/register"],
 };

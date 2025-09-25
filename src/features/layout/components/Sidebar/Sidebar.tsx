@@ -13,7 +13,9 @@ import {
   Settings,
   HelpCircle,
   LogOut,
+  GraduationCap,
 } from "lucide-react";
+import Link from "next/link";
 import styles from "./Sidebar.module.css";
 
 interface SidebarProps {
@@ -33,63 +35,67 @@ export default function Sidebar({ collapsed }: SidebarProps) {
       <div className={styles.menuWrapper}>
         <nav className={styles.menu}>
           <p className={styles.menuGroup}>DASHBOARD</p>
-          <a className={styles.menuItem}>
+          <Link href="/dashboard" className={styles.menuItem}>
             <LayoutDashboard size={18} className={styles.icon} />
             <span>Analytics</span>
-          </a>
-          <a className={styles.menuItem}>
+          </Link>
+          <Link href="/documents" className={styles.menuItem}>
             <FileText size={18} className={styles.icon} />
             <span>Documents</span>
-          </a>
-          <a className={styles.menuItem}>
+          </Link>
+          <Link href="/calendar" className={styles.menuItem}>
             <Calendar size={18} className={styles.icon} />
             <span>Calendar</span>
-          </a>
-          <a className={styles.menuItem}>
+          </Link>
+          <Link href="/notifications" className={styles.menuItem}>
             <Bell size={18} className={styles.icon} />
             <span>Notifications</span>
-          </a>
-          <a className={styles.menuItem}>
+          </Link>
+          <Link href="/tasks" className={styles.menuItem}>
             <CheckSquare size={18} className={styles.icon} />
             <span>Tasks</span>
-          </a>
+          </Link>
 
           <p className={styles.menuGroup}>RELATIONSHIPS</p>
-          <a className={styles.menuItem}>
+          <Link href="/departments" className={styles.menuItem}>
             <Users size={18} className={styles.icon} />
             <span>Departments</span>
-          </a>
-          <a className={styles.menuItem}>
+          </Link>
+          <Link href="/blog" className={styles.menuItem}>
             <BookOpen size={18} className={styles.icon} />
             <span>Blog</span>
-          </a>
-          <a className={styles.menuItem}>
+          </Link>
+          <Link href="/authorized/lms" className={styles.menuItem}>
+            <GraduationCap size={18} className={styles.icon} />
+            <span>LMS</span>
+          </Link>
+          <Link href="/chats" className={styles.menuItem}>
             <MessageSquare size={18} className={styles.icon} />
             <span>Chats</span>
-          </a>
+          </Link>
 
           <p className={styles.menuGroup}>CONFIGURATION</p>
-          <a className={styles.menuItem}>
+          <Link href="/admin" className={styles.menuItem}>
             <Shield size={18} className={styles.icon} />
             <span>Admin</span>
-          </a>
-          <a className={styles.menuItem}>
+          </Link>
+          <Link href="/settings" className={styles.menuItem}>
             <Settings size={18} className={styles.icon} />
             <span>Settings</span>
-          </a>
+          </Link>
         </nav>
       </div>
 
       {/* Bottom menu cố định đáy */}
       <div className={styles.bottomMenu}>
-        <a className={styles.menuItem}>
+        <Link href="/support" className={styles.menuItem}>
           <HelpCircle size={18} className={styles.icon} />
           <span>Support</span>
-        </a>
-        <a className={`${styles.menuItem} ${styles.logout}`}>
+        </Link>
+        <Link href="/logout" className={`${styles.menuItem} ${styles.logout}`}>
           <LogOut size={18} className={styles.icon} />
           <span>Logout</span>
-        </a>
+        </Link>
       </div>
     </aside>
   );

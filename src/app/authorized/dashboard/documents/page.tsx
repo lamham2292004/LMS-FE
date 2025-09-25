@@ -1,5 +1,7 @@
-import UsersPageContent from "@/src/features/documents/components/UsersPageContent";
+"use client";
 
-export default function UsersPage() {
-  return <UsersPageContent />;
+import { LMSDashboard } from "@/features/lms";
+
+export default function DocumentsPage() {
+  return <LMSDashboard />;
 }

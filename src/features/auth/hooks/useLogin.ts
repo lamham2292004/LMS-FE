@@ -1,5 +1,5 @@
 "use client";
-
+import Cookies from 'js-cookie';
 import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { LoginRequest } from "@/lib/api";
@@ -25,51 +25,57 @@ export const useLogin = (): UseLoginReturn => {
 
       const response = await login(credentials);
 
-      // Handle both formats: response.data OR response.user
-      const userData = response.data || response.user;
-      if (userData) {
-        console.log("Login successful, user data:", userData);
-        console.log("User type:", userData.user_type);
+      // Lấy đúng token và user từ response
+      const { user, token } = response || {};
+      if (token) {
+        Cookies.set("token", token, { expires: 7, path: '/' });
+      }
+      if (user?.user_type) {
+        Cookies.set("role", user.user_type, { expires: 7, path: '/' });
+      }
 
-        // Debug logging
-        console.log("useLogin - User data:", userData);
-        console.log("useLogin - User type:", userData.user_type);
-        console.log("useLogin - Is admin:", userData.is_admin);
-        console.log("useLogin - Is admin type:", typeof userData.is_admin);
-        console.log("useLogin - User data keys:", Object.keys(userData));
+      // Debug logging
+      console.log("Login successful, user:", user);
+      console.log("Token:", token);
+      console.log("User type:", user?.user_type);
+      console.log("Is admin:", user?.is_admin);
+      console.log("User keys:", user ? Object.keys(user) : []);
 
-        // Redirect based on user type và is_admin
-        let redirectPath = "/authorized/dashboard";
-        if (userData.user_type === "student") {
-          redirectPath = "/authorized/student/dashboard";
-        } else if (userData.user_type === "lecturer") {
-          // Handle both boolean and string values for is_admin
-          const isAdmin = Boolean(userData.account?.is_admin);
-          console.log("useLogin - Is admin (parsed):", isAdmin);
+      // Redirect based on user type và is_admin
+      let redirectPath = "/authorized/dashboard";
+      if (user?.user_type === "student") {
+        redirectPath = "/authorized/student/dashboard";
+      } else if (user?.user_type === "lecturer") {
+        // Handle both boolean and string values for is_admin
+        const isAdmin = Boolean(user?.account?.is_admin);
+        console.log("useLogin - Is admin (parsed):", isAdmin);
 
-          if (isAdmin) {
-            redirectPath = "/authorized/admin/dashboard"; // Lecturer + is_admin = Admin
-            console.log("useLogin - Redirecting to ADMIN dashboard");
-          } else {
-            redirectPath = "/authorized/lecturer/dashboard"; // Lecturer + !is_admin = Giáo viên
-            console.log("useLogin - Redirecting to LECTURER dashboard");
-          }
-        }
-
-        console.log("Redirecting to:", redirectPath);
-
-        // Try router.push first
-        try {
-          router.push(redirectPath);
-          console.log("Router.push executed successfully");
-        } catch (routerError) {
-          console.error("Router.push failed:", routerError);
-          // Fallback to window.location
-          window.location.href = redirectPath;
+        if (isAdmin) {
+          redirectPath = "/authorized/admin/dashboard"; // Lecturer + is_admin = Admin
+          console.log("useLogin - Redirecting to ADMIN dashboard");
+        } else {
+          redirectPath = "/authorized/lecturer/dashboard"; // Lecturer + !is_admin = Giáo viên
+          console.log("useLogin - Redirecting to LECTURER dashboard");
         }
       }
-    } catch (err: any) {
-      setError(err.message || "Đăng nhập thất bại. Vui lòng thử lại.");
+
+      console.log("Redirecting to:", redirectPath);
+
+      // Try router.push first
+      try {
+        router.push(redirectPath);
+        console.log("Router.push executed successfully");
+      } catch (routerError) {
+        console.error("Router.push failed:", routerError);
+        // Fallback to window.location
+        window.location.href = redirectPath;
+      }
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        setError(err.message || "Đăng nhập thất bại. Vui lòng thử lại.");
+      } else {
+        setError("Đăng nhập thất bại. Vui lòng thử lại.");
+      }
     } finally {
       setIsLoading(false);
     }
