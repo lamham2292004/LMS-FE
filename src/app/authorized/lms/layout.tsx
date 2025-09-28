@@ -1,8 +1,10 @@
+// src/app/authorized/lms/layout.tsx
 "use client";
 
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/features/auth";
 import { 
   BookOpen, 
   ShoppingCart, 
@@ -11,7 +13,8 @@ import {
   Users,
   BarChart3,
   Settings,
-  Plus
+  Plus,
+  PenTool
 } from "lucide-react";
 
 export default function LMSLayout({
@@ -21,6 +24,7 @@ export default function LMSLayout({
 }) {
   const pathname = usePathname();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { user, userRole } = useAuth();
 
   const menuItems = [
     {
@@ -36,7 +40,8 @@ export default function LMSLayout({
     {
       title: "Giỏ hàng",
       href: "/authorized/lms/cart",
-      icon: ShoppingCart
+      icon: ShoppingCart,
+      studentOnly: true
     },
     {
       title: "Bài kiểm tra",
@@ -51,22 +56,44 @@ export default function LMSLayout({
     {
       title: "Học viên",
       href: "/authorized/lms/students",
-      icon: Users
+      icon: Users,
+      adminOnly: true
     }
   ];
 
   const adminItems = [
     {
+      title: "Quản lý khóa học",
+      href: "/authorized/lms/management",
+      icon: PenTool,
+      lecturerOrAdmin: true
+    },
+    {
       title: "Tạo khóa học",
       href: "/authorized/lms/admin/courses/create",
-      icon: Plus
+      icon: Plus,
+      lecturerOrAdmin: true
     },
     {
       title: "Cài đặt",
       href: "/authorized/lms/admin/settings",
-      icon: Settings
+      icon: Settings,
+      adminOnly: true
     }
   ];
+
+  // Filter menu items based on user role
+  const filteredMenuItems = menuItems.filter(item => {
+    if (item.studentOnly && userRole !== 'student') return false;
+    if (item.adminOnly && userRole !== 'admin') return false;
+    return true;
+  });
+
+  const filteredAdminItems = adminItems.filter(item => {
+    if (item.adminOnly && userRole !== 'admin') return false;
+    if (item.lecturerOrAdmin && !['lecturer', 'admin'].includes(userRole || '')) return false;
+    return true;
+  });
 
   return (
     <div className="flex min-h-screen bg-gray-50">
@@ -90,10 +117,10 @@ export default function LMSLayout({
 
         <nav className="p-4">
           <div className="space-y-1">
-            {menuItems.map((item) => {
+            {filteredMenuItems.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href || 
-                             (item.href !== "/authorized/lms" && pathname.startsWith(item.href));
+                          (item.href !== "/authorized/lms" && pathname.startsWith(item.href));
               
               return (
                 <Link
@@ -114,17 +141,17 @@ export default function LMSLayout({
             })}
           </div>
 
-          {!sidebarCollapsed && (
+          {!sidebarCollapsed && filteredAdminItems.length > 0 && (
             <>
               <div className="mt-8 pt-4 border-t border-gray-200">
                 <p className="px-3 text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
-                  Quản trị
+                  {userRole === 'admin' ? 'Quản trị' : 'Giảng dạy'}
                 </p>
                 <div className="space-y-1">
-                  {adminItems.map((item) => {
+                  {filteredAdminItems.map((item) => {
                     const Icon = item.icon;
                     const isActive = pathname === item.href || 
-                                   pathname.startsWith(item.href);
+                              pathname.startsWith(item.href);
                     
                     return (
                       <Link
@@ -147,11 +174,22 @@ export default function LMSLayout({
           )}
         </nav>
 
-        {/* Collapse Button */}
-        <div className="absolute bottom-4 left-4">
+        {/* User Info & Collapse Button */}
+        <div className="absolute bottom-4 left-4 right-4">
+          {!sidebarCollapsed && user && (
+            <div className="bg-gray-50 rounded-lg p-3 mb-3">
+              <div className="text-sm font-medium text-gray-900 truncate">
+                {user.full_name}
+              </div>
+              <div className="text-xs text-gray-500 capitalize">
+                {userRole}
+              </div>
+            </div>
+          )}
+          
           <button
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+            className="w-full p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors text-center"
           >
             {sidebarCollapsed ? "→" : "←"}
           </button>

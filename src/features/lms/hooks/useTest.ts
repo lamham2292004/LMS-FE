@@ -1,72 +1,123 @@
+// src/features/lms/hooks/useTest.ts
 "use client";
 
 import { useState, useEffect } from "react";
-import { Question, Test } from "../types";
+import { apiClient } from "@/lib/api";
+
+export interface Question {
+  id: number;
+  quizId: number;
+  questionText: string;
+  questionType: "MULTIPLE_CHOICE" | "TRUE_FALSE" | "SHORT_ANSWER";
+  orderIndex: number;
+  points: number;
+  createdAt: string;
+  updatedAt: string;
+  answerOptions?: AnswerOption[];
+}
+
+export interface AnswerOption {
+  id: number;
+  questionId: number;
+  answerText: string;
+  isCorrect: boolean;
+  orderIndex: number;
+}
+
+export interface Test {
+  id: number;
+  title: string;
+  description: string;
+  course_id: number;
+  questions_count: number;
+  duration: number; // minutes
+  passing_score: number;
+  attempts_allowed: number;
+  status: 'active' | 'inactive';
+  created_at: string;
+}
 
 export const useTest = (testId: number) => {
+  const [quiz, setQuiz] = useState<any>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string | string[]>>({});
   const [timeRemaining, setTimeRemaining] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [canTake, setCanTake] = useState<boolean>(true);
 
   useEffect(() => {
-    // Load test questions
     const loadTest = async () => {
       try {
-        // Mock questions for development
-        const mockQuestions: Question[] = [
-          {
-            id: 1,
-            test_id: testId,
-            question: "What is the name of the first page you encounter after logging into your web page?",
-            type: "multiple_choice",
-            options: ["Dashboard", "Security question page", "WP upgrade option", "WPAdmin"],
-            correct_answer: "Dashboard",
-            points: 5,
-            explanation: "The dashboard is typically the first page users see after logging in."
-          },
-          {
-            id: 2,
-            test_id: testId,
-            question: "What is WordPress?",
-            type: "essay",
-            points: 10,
-            explanation: "WordPress is a content management system (CMS) that allows users to create and manage websites."
-          },
-          {
-            id: 3,
-            test_id: testId,
-            question: "How can you get involved with WordPress?",
-            type: "multiple_choice",
-            options: ["Attend Word Camp", "Edit the Codex (documentation)", "Help in the Forums", "All of these"],
-            correct_answer: "All of these",
-            points: 5
-          },
-          {
-            id: 4,
-            test_id: testId,
-            question: "What ways to use WordPress?",
-            type: "multiple_choice",
-            options: ["Arcade", "Blog", "Content Management System (CMS)", "All of the above"],
-            correct_answer: "All of the above",
-            points: 5
-          }
-        ];
+        setLoading(true);
 
-        setQuestions(mockQuestions);
-        setTimeRemaining(60 * 60); // 60 minutes in seconds
+        // First check if user can take this quiz
+        const canTakeResponse = await apiClient.canTakeQuiz(testId);
+        if (canTakeResponse.result !== undefined) {
+          setCanTake(canTakeResponse.result);
+          if (!canTakeResponse.result) {
+            setLoading(false);
+            return;
+          }
+        }
+
+        // Load quiz details
+        const quizResponse = await apiClient.getQuizById(testId);
+        if (quizResponse.result) {
+          const quizData = quizResponse.result;
+          setQuiz(quizData);
+          
+          // Set timer
+          if (quizData.timeLimit) {
+            setTimeRemaining(quizData.timeLimit * 60); // Convert minutes to seconds
+          }
+        }
+
+        // Load questions for the quiz
+        const questionsResponse = await apiClient.getQuestionsByQuiz(testId);
+        if (questionsResponse.result) {
+          const questionsData = questionsResponse.result;
+          
+          // Load answer options for each question
+          const questionsWithOptions = await Promise.all(
+            questionsData.map(async (question: Question) => {
+              if (question.questionType === 'MULTIPLE_CHOICE') {
+                try {
+                  const optionsResponse = await apiClient.getAnswerOptionsByQuestion(question.id);
+                  return {
+                    ...question,
+                    answerOptions: optionsResponse.result || []
+                  };
+                } catch (error) {
+                  console.warn(`Failed to load options for question ${question.id}:`, error);
+                  return question;
+                }
+              }
+              return question;
+            })
+          );
+
+          // Sort by order index
+          questionsWithOptions.sort((a, b) => (a.orderIndex || 0) - (b.orderIndex || 0));
+          setQuestions(questionsWithOptions);
+        }
+
+      } catch (error) {
+        console.error('Error loading test:', error);
+        setCanTake(false);
       } finally {
         setLoading(false);
       }
     };
 
-    loadTest();
+    if (testId) {
+      loadTest();
+    }
   }, [testId]);
 
   // Timer countdown
   useEffect(() => {
-    if (timeRemaining > 0) {
+    if (timeRemaining > 0 && questions.length > 0) {
       const timer = setTimeout(() => {
         setTimeRemaining(prev => prev - 1);
       }, 1000);
@@ -76,7 +127,7 @@ export const useTest = (testId: number) => {
       // Auto-submit when time runs out
       submitTest();
     }
-  }, [timeRemaining]);
+  }, [timeRemaining, questions.length]);
 
   const setAnswer = (questionId: number, answer: string | string[]) => {
     setAnswers(prev => ({
@@ -87,67 +138,70 @@ export const useTest = (testId: number) => {
 
   const submitTest = async () => {
     try {
-      // Calculate score
-      let correctAnswers = 0;
-      let totalPoints = 0;
-      let earnedPoints = 0;
+      setLoading(true);
 
-      questions.forEach(question => {
-        totalPoints += question.points;
-        const userAnswer = answers[question.id];
-        
-        if (userAnswer && question.correct_answer) {
-          if (Array.isArray(question.correct_answer)) {
-            // Multiple correct answers
-            if (Array.isArray(userAnswer) && 
-                userAnswer.sort().join(',') === question.correct_answer.sort().join(',')) {
-              correctAnswers++;
-              earnedPoints += question.points;
-            }
-          } else {
-            // Single correct answer
-            if (userAnswer === question.correct_answer) {
-              correctAnswers++;
-              earnedPoints += question.points;
-            }
-          }
+      // Prepare answers for submission
+      const formattedAnswers: Record<number, string> = {};
+      
+      Object.entries(answers).forEach(([questionId, answer]) => {
+        if (Array.isArray(answer)) {
+          formattedAnswers[parseInt(questionId)] = answer.join(',');
+        } else {
+          formattedAnswers[parseInt(questionId)] = answer;
         }
       });
 
-      const percentage = totalPoints > 0 ? (earnedPoints / totalPoints) * 100 : 0;
-      const passed = percentage >= 70; // 70% passing grade
+      // Calculate time taken
+      const timeTaken = quiz?.timeLimit ? 
+        Math.ceil((quiz.timeLimit * 60 - timeRemaining) / 60) : 
+        0;
 
-      // Redirect to results page with data
-      const resultData = {
-        score: earnedPoints,
-        percentage,
-        correct_answers: correctAnswers,
-        wrong_answers: questions.length - correctAnswers,
-        total_questions: questions.length,
-        passed,
-        time_taken: Math.ceil((60 * 60 - timeRemaining) / 60), // minutes
-        completed_at: new Date().toISOString()
+      // Submit to backend
+      const submitData = {
+        quizId: testId,
+        answers: formattedAnswers,
+        timeTaken
       };
 
-      // Store result in localStorage for demo
-      localStorage.setItem('test_result', JSON.stringify(resultData));
+      const response = await apiClient.submitQuiz(submitData);
       
-      // Navigate to results
-      window.location.href = '/authorized/lms/tests/result';
+      if (response.result) {
+        // Redirect to results page
+        const resultData = response.result;
+        localStorage.setItem('test_result', JSON.stringify(resultData));
+        window.location.href = '/authorized/lms/tests/result';
+      }
       
     } catch (error) {
       console.error('Error submitting test:', error);
+      alert('Failed to submit test. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
+  // Transform questions to match UI expectations
+  const transformedQuestions = questions.map(q => ({
+    id: q.id,
+    test_id: testId,
+    question: q.questionText,
+    type: q.questionType.toLowerCase().replace('_', '_') as 'multiple_choice' | 'true_false' | 'short_answer',
+    options: q.answerOptions?.map(opt => opt.answerText) || [],
+    correct_answer: q.answerOptions?.find(opt => opt.isCorrect)?.answerText,
+    points: q.points,
+    explanation: undefined // Backend doesn't have explanation field
+  }));
+
   return {
-    questions,
+    quiz,
+    questions: transformedQuestions,
     currentQuestion,
     setCurrentQuestion,
     answers,
     setAnswer,
     timeRemaining,
     submitTest,
-    loading
+    loading,
+    canTake
   };
 };

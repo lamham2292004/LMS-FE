@@ -1,8 +1,54 @@
+// src/features/lms/hooks/useCourses.ts
 "use client";
 
 import { useState, useEffect } from "react";
-import { Course, CourseFilters } from "../types";
 import { apiClient } from "@/lib/api";
+
+// Updated Course interface to match backend response
+export interface Course {
+  id: number;
+  title: string;
+  description: string;
+  price: number;
+  teacherId: number;
+  status: "UPCOMING" | "OPEN" | "CLOSED";
+  startTime?: string;
+  endTime?: string;
+  createdAt: string;
+  updatedAt: string;
+  categoryId?: number;
+  categoryName?: string;
+  img?: string;
+  lessons?: any[];
+  enrollments?: any[];
+  // Computed fields for UI compatibility
+  image_url: string;
+  original_price?: number;
+  discount_percentage?: number;
+  instructor_name: string;
+  instructor_avatar: string;
+  category: string;
+  subcategory?: string;
+  duration: string;
+  lectures_count: number;
+  students_enrolled: number;
+  rating: number;
+  rating_count: number;
+  is_bestseller: boolean;
+  level: 'Beginner' | 'Intermediate' | 'Advanced';
+  languages: string[];
+  last_updated: string;
+  sections: any[];
+  requirements: string[];
+  what_you_learn: string[];
+}
+
+interface CourseFilters {
+  featured?: boolean;
+  limit?: number;
+  category?: string;
+  search?: string;
+}
 
 interface UseCoursesOptions {
   featured?: boolean;
@@ -20,157 +66,84 @@ export const useCourses = (options: UseCoursesOptions = {}) => {
     const fetchCourses = async () => {
       try {
         setLoading(true);
-        const params = new URLSearchParams();
+        setError(null);
         
-        if (options.featured) params.append("featured", "true");
-        if (options.limit) params.append("limit", options.limit.toString());
-        if (options.category) params.append("category", options.category);
+        const response = await apiClient.getCourses();
         
-        const response = await apiClient.request<Course[]>(`/v1/lms/courses?${params.toString()}`);
-        
-        if (response.data) {
-          setCourses(response.data);
+        if (response.result) {
+          // Transform backend data to match frontend interface
+          const transformedCourses = response.result.map((course: any) => ({
+            id: course.id,
+            title: course.title,
+            description: course.description || '',
+            price: course.price || 0,
+            teacherId: course.teacherId,
+            status: course.status,
+            startTime: course.startTime,
+            endTime: course.endTime,
+            createdAt: course.createdAt,
+            updatedAt: course.updatedAt,
+            categoryId: course.categoryId,
+            categoryName: course.categoryName || 'General',
+            img: course.img,
+            lessons: course.lessons || [],
+            enrollments: course.enrollments || [],
+            // UI compatibility fields
+            image_url: course.img ? `http://localhost:8083${course.img}` : '/placeholder-course.jpg',
+            original_price: course.price ? course.price * 1.5 : undefined, // Mock original price
+            discount_percentage: course.price ? Math.floor(Math.random() * 30) + 10 : undefined,
+            instructor_name: 'Instructor Name', // TODO: Get from user service
+            instructor_avatar: '/placeholder-avatar.jpg',
+            category: course.categoryName || 'Development',
+            subcategory: 'Programming',
+            duration: `${Math.floor(Math.random() * 30) + 10} hours`, // Mock duration
+            lectures_count: course.lessons?.length || Math.floor(Math.random() * 50) + 20,
+            students_enrolled: Math.floor(Math.random() * 1000) + 100,
+            rating: parseFloat((4 + Math.random()).toFixed(1)),
+            rating_count: Math.floor(Math.random() * 10000) + 100,
+            is_bestseller: Math.random() > 0.7,
+            level: ['Beginner', 'Intermediate', 'Advanced'][Math.floor(Math.random() * 3)] as any,
+            languages: ['English'],
+            last_updated: new Date(course.updatedAt).toLocaleDateString(),
+            sections: [],
+            requirements: [
+              'Basic computer skills',
+              'Internet connection',
+              'Willingness to learn'
+            ],
+            what_you_learn: [
+              'Master the fundamentals',
+              'Build real projects',
+              'Advanced techniques',
+              'Best practices'
+            ]
+          }));
+
+          // Apply filters
+          let filteredCourses = transformedCourses;
+
+          if (options.category) {
+            filteredCourses = filteredCourses.filter(course => 
+              course.category.toLowerCase().includes(options.category!.toLowerCase())
+            );
+          }
+
+          if (options.featured) {
+            filteredCourses = filteredCourses.filter(course => course.is_bestseller);
+          }
+
+          if (options.limit) {
+            filteredCourses = filteredCourses.slice(0, options.limit);
+          }
+
+          setCourses(filteredCourses);
         }
       } catch (err: any) {
+        console.error('Error fetching courses:', err);
         setError(err.message);
-        // Mock data for development
-        setCourses([
-          {
-            id: 1,
-            title: "The Complete JavaScript Course 2024: Build Real Projects!",
-            description: "The only course you need to learn web development - HTML, CSS, JS, Node, and More!",
-            image_url: "https://img-c.udemycdn.com/course/750x422/851712_fc61_6.jpg",
-            price: 15,
-            original_price: 89.99,
-            discount_percentage: 83,
-            instructor_name: "Jessica William",
-            instructor_avatar: "/avatars/jessica.jpg",
-            category: "Development",
-            subcategory: "JavaScript",
-            duration: "28 hours",
-            lectures_count: 402,
-            students_enrolled: 114521,
-            rating: 4.5,
-            rating_count: 81665,
-            is_bestseller: true,
-            level: "Beginner",
-            languages: ["English", "Vietnamese"],
-            last_updated: "1/2024",
-            status: "published",
-            created_at: "2024-01-01",
-            updated_at: "2024-01-15",
-            sections: [],
-            requirements: [
-              "Have a computer with Internet",
-              "Be ready to learn an insane amount of awesome stuff",
-              "Prepare to build real web apps!"
-            ],
-            what_you_learn: [
-              "Build 16 beautiful real-world projects for your portfolio",
-              "Master modern JavaScript from scratch",
-              "Learn Node.js and Express.js",
-              "Understand how JavaScript works behind the scenes",
-              "Build modern and beautiful user interfaces",
-              "Become job-ready by understanding how JavaScript really works"
-            ]
-          },
-          {
-            id: 2,
-            title: "Beginning C++ Programming - From Beginner to Beyond",
-            description: "Obtain Modern C++ skills from C++11 to C++17 as you build your foundation in C++ programming",
-            image_url: "https://img-c.udemycdn.com/course/750x422/1576994_e54e_4.jpg",
-            price: 13,
-            original_price: 84.99,
-            discount_percentage: 85,
-            instructor_name: "Joginder Singh",
-            instructor_avatar: "/avatars/joginder.jpg",
-            category: "Development",
-            subcategory: "C++",
-            duration: "12 hours",
-            lectures_count: 215,
-            students_enrolled: 45230,
-            rating: 4.3,
-            rating_count: 18649,
-            is_bestseller: true,
-            level: "Beginner",
-            languages: ["English"],
-            last_updated: "18 days ago",
-            status: "published",
-            created_at: "2024-01-01",
-            updated_at: "2024-01-15",
-            sections: [],
-            requirements: [
-              "Access to a computer",
-              "No programming experience needed",
-              "Basic understanding of computers"
-            ],
-            what_you_learn: [
-              "Learn to program with one of the most powerful programming languages",
-              "Obtain the key concepts of programming that will also apply to other programming languages",
-              "Learn Modern C++ rather than outdated C++ concepts",
-              "Learn C++ features from basic to advanced"
-            ]
-          },
-          {
-            id: 3,
-            title: "Complete Python Bootcamp: Go from zero to hero in Python 3",
-            description: "Learn Python like a Professional Start from the basics and go all the way to creating your own applications and games",
-            image_url: "https://img-c.udemycdn.com/course/750x422/629302_8a2d_2.jpg",
-            price: 10,
-            original_price: 74.99,
-            discount_percentage: 87,
-            instructor_name: "John Doe",
-            instructor_avatar: "/avatars/john.jpg",
-            category: "Development",
-            subcategory: "Python",
-            duration: "25 hours",
-            lectures_count: 156,
-            students_enrolled: 487239,
-            rating: 4.6,
-            rating_count: 165432,
-            is_bestseller: true,
-            level: "Beginner",
-            languages: ["English", "Spanish"],
-            last_updated: "15 days ago",
-            status: "published",
-            created_at: "2024-01-01",
-            updated_at: "2024-01-15",
-            sections: [
-              {
-                id: 1,
-                title: "Introduction to this Course",
-                lectures_count: 8,
-                duration: "22:08",
-                lectures: [
-                  {
-                    id: 1,
-                    title: "A Note On Asking For Help",
-                    type: "text",
-                    duration: "00:12",
-                    is_preview: false
-                  },
-                  {
-                    id: 2,
-                    title: "Introducing Our TA",
-                    type: "video",
-                    duration: "01:42",
-                    is_preview: true
-                  }
-                ]
-              }
-            ],
-            requirements: [
-              "Just a computer with internet access",
-              "Basic understanding of how to use a computer"
-            ],
-            what_you_learn: [
-              "Learn to use Python professionally",
-              "Create games with Python",
-              "Learn advanced Python features",
-              "Build GUIs and Desktop applications with Python"
-            ]
-          }
-        ]);
+        
+        // Fallback to empty array or show error message
+        setCourses([]);
       } finally {
         setLoading(false);
       }

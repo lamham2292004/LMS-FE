@@ -1,7 +1,15 @@
+// src/features/lms/hooks/useCart.ts
 "use client";
 
 import { useState, useEffect } from "react";
-import { CartItem } from "../types";
+import { apiClient } from "@/lib/api";
+
+export interface CartItem {
+  id: number;
+  course_id: number;
+  course: any; // Use Course interface
+  added_at: string;
+}
 
 export const useCart = () => {
   const [items, setItems] = useState<CartItem[]>([]);
@@ -27,6 +35,7 @@ export const useCart = () => {
   const addToCart = async (courseId: number) => {
     try {
       setLoading(true);
+      
       // Check if item already in cart
       const existingItem = items.find(item => item.course_id === courseId);
       if (existingItem) {
@@ -34,16 +43,60 @@ export const useCart = () => {
         return;
       }
 
-      // In real app, fetch course details from API
-      // For now, mock the course data
+      // Fetch course details from LMS API
+      const response = await apiClient.getCourseById(courseId);
+      
+      if (response.result) {
+        const course = response.result;
+        
+        // Transform to match UI expectations
+        const transformedCourse = {
+          id: course.id,
+          title: course.title,
+          description: course.description || '',
+          image_url: course.img ? `http://localhost:8083${course.img}` : '/placeholder-course.jpg',
+          price: course.price || 0,
+          original_price: course.price ? course.price * 1.5 : undefined,
+          instructor_name: 'Instructor Name', // TODO: Get from user service
+          instructor_avatar: '/placeholder-avatar.jpg',
+          category: course.categoryName || 'Development',
+          duration: '10 hours', // Mock duration
+          lectures_count: 50,
+          students_enrolled: 1000,
+          rating: 4.5,
+          rating_count: 100,
+          is_bestseller: false,
+          level: "Beginner" as const,
+          languages: ["English"],
+          last_updated: "1/2024",
+          status: "published" as const,
+          created_at: course.createdAt,
+          updated_at: course.updatedAt,
+          sections: [],
+          requirements: [],
+          what_you_learn: []
+        };
+
+        const newItem: CartItem = {
+          id: Date.now(), // Generate unique ID
+          course_id: courseId,
+          course: transformedCourse,
+          added_at: new Date().toISOString()
+        };
+
+        setItems(prev => [...prev, newItem]);
+      }
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+      // Still add to cart with mock data as fallback
       const mockCourse = {
         id: courseId,
-        title: "Sample Course",
-        description: "Sample description",
+        title: "Course Title",
+        description: "Course description",
         image_url: "/placeholder-course.jpg",
         price: 15,
         original_price: 89.99,
-        instructor_name: "Sample Instructor",
+        instructor_name: "Instructor",
         instructor_avatar: "/placeholder-avatar.jpg",
         category: "Development",
         duration: "10 hours",
@@ -56,15 +109,15 @@ export const useCart = () => {
         languages: ["English"],
         last_updated: "1/2024",
         status: "published" as const,
-        created_at: "2024-01-01",
-        updated_at: "2024-01-15",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
         sections: [],
         requirements: [],
         what_you_learn: []
       };
 
       const newItem: CartItem = {
-        id: Date.now(), // Generate unique ID
+        id: Date.now(),
         course_id: courseId,
         course: mockCourse,
         added_at: new Date().toISOString()
@@ -88,6 +141,47 @@ export const useCart = () => {
     return items.some(item => item.course_id === courseId);
   };
 
+  // Enroll in course (checkout process)
+  const enrollCourse = async (courseId: number) => {
+    try {
+      setLoading(true);
+      
+      // Call enrollment API
+      const response = await apiClient.enrollCourse(courseId);
+      
+      if (response.result) {
+        // Remove from cart after successful enrollment
+        setItems(prev => prev.filter(item => item.course_id !== courseId));
+        return response.result;
+      }
+    } catch (error) {
+      console.error("Error enrolling in course:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const checkoutAll = async () => {
+    try {
+      setLoading(true);
+      
+      // Enroll in all courses in cart
+      const enrollmentPromises = items.map(item => enrollCourse(item.course_id));
+      await Promise.all(enrollmentPromises);
+      
+      // Clear cart after successful checkout
+      clearCart();
+      
+      return true;
+    } catch (error) {
+      console.error("Error during checkout:", error);
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Calculate totals
   const total = items.reduce((sum, item) => sum + item.course.price, 0);
   const originalTotal = items.reduce((sum, item) => 
@@ -101,8 +195,9 @@ export const useCart = () => {
     removeFromCart,
     clearCart,
     isInCart,
+    enrollCourse,
+    checkoutAll,
     total,
     originalTotal,
     savings
   };
-};
